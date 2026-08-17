@@ -116,6 +116,7 @@ var day =
 var todayString =
     year + "-" + month + "-" + day;
 
+
 if (appointmentDate) {
 
     appointmentDate.min =
@@ -125,115 +126,402 @@ if (appointmentDate) {
 
 
 // ======================================
-// CARREGAR PACIENTES DO LOCALSTORAGE
+// CARREGAR PACIENTES
 // ======================================
 
 function carregarPacientes() {
 
     if (!patient) {
-
         return;
-
     }
 
 
-    // Mantém os pacientes que já estão
-    // escritos no HTML.
+    /*
+     * Limpa o select antes de carregar.
+     * Isso evita pacientes duplicados
+     * caso a função seja executada novamente.
+     */
+
+    patient.innerHTML = "";
+
+
+    var primeiraOpcao =
+        document.createElement("option");
+
+    primeiraOpcao.value = "";
+
+    primeiraOpcao.textContent =
+        "Selecione um paciente";
+
+    patient.appendChild(
+        primeiraOpcao
+    );
+
+
+    /*
+     * ==================================
+     * 1. PACIENTES DA RECEPÇÃO
+     * ==================================
+     */
 
     var pacientesCadastrados =
-        localStorage.getItem(
-            "pacientesCadastrados"
-        );
+        JSON.parse(
+            localStorage.getItem(
+                "pacientesCadastrados"
+            )
+        ) || [];
 
 
-    if (!pacientesCadastrados) {
+    /*
+     * ==================================
+     * 2. USUÁRIOS CRIADOS PELO ADM
+     * ==================================
+     */
 
-        return;
-
-    }
-
-
-    try {
-
-        var pacientes =
-            JSON.parse(
-                pacientesCadastrados
-            ) || [];
-
-
-        pacientes.forEach(
-            function (paciente) {
-
-                // Verifica se o paciente
-                // já existe no select.
-
-                var cpfNumerico =
-                    String(
-                        paciente.cpf || ""
-                    ).replace(/\D/g, "");
+    var usuarios =
+        JSON.parse(
+            localStorage.getItem(
+                "clinicaUsuarios"
+            )
+        ) || [];
 
 
-                var existe =
-                    Array.from(
-                        patient.options
-                    ).some(
-                        function (option) {
+    /*
+     * Junta as duas fontes.
+     */
+
+    var pacientes =
+        [];
+
+
+    /*
+     * Adiciona os pacientes cadastrados
+     * pela Recepção.
+     */
+
+    pacientesCadastrados.forEach(
+        function (paciente) {
+
+            pacientes.push({
+
+                nome:
+                    paciente.nome ||
+                    paciente.name ||
+                    "Paciente",
+
+                cpf:
+                    paciente.cpf ||
+                    "",
+
+                email:
+                    paciente.email ||
+                    "",
+
+                nascimento:
+                    paciente.nascimento ||
+                    paciente.dataNascimento ||
+                    ""
+
+            });
+
+        }
+    );
+
+
+    /*
+     * Adiciona somente usuários cujo
+     * perfil seja PACIENTE.
+     */
+
+    usuarios.forEach(
+        function (usuario) {
+
+            var tipo =
+                String(
+                    usuario.tipo ||
+                    usuario.role ||
+                    usuario.perfil ||
+                    ""
+                )
+                .toLowerCase()
+                .trim();
+
+
+            if (
+                tipo === "paciente"
+            ) {
+
+                pacientes.push({
+
+                    nome:
+                        usuario.nome ||
+                        usuario.name ||
+                        "Paciente",
+
+                    cpf:
+                        usuario.cpf ||
+                        "",
+
+                    email:
+                        usuario.email ||
+                        "",
+
+                    nascimento:
+                        usuario.nascimento ||
+                        usuario.dataNascimento ||
+                        ""
+
+                });
+
+            }
+
+        }
+    );
+
+
+    /*
+     * ==================================
+     * REMOVER DUPLICADOS
+     * ==================================
+     */
+
+    var pacientesUnicos =
+        [];
+
+
+    pacientes.forEach(
+        function (paciente) {
+
+            var nome =
+                String(
+                    paciente.nome || ""
+                )
+                .trim();
+
+
+            var cpf =
+                String(
+                    paciente.cpf || ""
+                )
+                .replace(
+                    /\D/g,
+                    ""
+                );
+
+
+            var email =
+                String(
+                    paciente.email || ""
+                )
+                .trim()
+                .toLowerCase();
+
+
+            var jaExiste =
+                pacientesUnicos.some(
+                    function (item) {
+
+                        var itemNome =
+                            String(
+                                item.nome || ""
+                            )
+                            .trim()
+                            .toLowerCase();
+
+
+                        var itemCpf =
+                            String(
+                                item.cpf || ""
+                            )
+                            .replace(
+                                /\D/g,
+                                ""
+                            );
+
+
+                        var itemEmail =
+                            String(
+                                item.email || ""
+                            )
+                            .trim()
+                            .toLowerCase();
+
+
+                        /*
+                         * Se tiver CPF,
+                         * compara pelo CPF.
+                         */
+
+                        if (
+                            cpf &&
+                            itemCpf
+                        ) {
 
                             return (
-                                option.getAttribute(
-                                    "data-cpf"
-                                ) ===
-                                cpfNumerico
+                                cpf ===
+                                itemCpf
                             );
 
                         }
-                    );
 
 
-                if (existe) {
+                        /*
+                         * Se tiver e-mail,
+                         * compara pelo e-mail.
+                         */
 
-                    return;
+                        if (
+                            email &&
+                            itemEmail
+                        ) {
 
-                }
+                            return (
+                                email ===
+                                itemEmail
+                            );
 
-
-                var option =
-                    document.createElement(
-                        "option"
-                    );
-
-
-                option.value =
-                    paciente.nome;
+                        }
 
 
-                option.textContent =
-                    paciente.nome +
+                        /*
+                         * Caso não tenha CPF
+                         * nem e-mail, usa o nome.
+                         */
+
+                        return (
+                            nome &&
+                            itemNome &&
+                            nome.toLowerCase() ===
+                            itemNome
+                        );
+
+                    }
+                );
+
+
+            if (
+                !jaExiste
+            ) {
+
+                pacientesUnicos.push(
+                    paciente
+                );
+
+            }
+
+        }
+    );
+
+
+    /*
+     * ==================================
+     * COLOCAR NO SELECT
+     * ==================================
+     */
+
+    pacientesUnicos.forEach(
+        function (paciente) {
+
+            var option =
+                document.createElement(
+                    "option"
+                );
+
+
+            option.value =
+                paciente.nome;
+
+
+            var texto =
+                paciente.nome;
+
+
+            if (
+                paciente.cpf
+            ) {
+
+                texto +=
                     " — CPF " +
                     formatarCPF(
                         paciente.cpf
                     );
 
+            } else if (
+                paciente.email
+            ) {
+
+                texto +=
+                    " — " +
+                    paciente.email;
+
+            }
+
+
+            option.textContent =
+                texto;
+
+
+            if (
+                paciente.cpf
+            ) {
 
                 option.setAttribute(
                     "data-cpf",
-                    cpfNumerico
-                );
-
-
-                patient.appendChild(
-                    option
+                    String(
+                        paciente.cpf
+                    )
+                    .replace(
+                        /\D/g,
+                        ""
+                    )
                 );
 
             }
-        );
 
 
-    } catch (erro) {
+            if (
+                paciente.email
+            ) {
 
-        console.error(
-            "Erro ao carregar pacientes:",
-            erro
+                option.setAttribute(
+                    "data-email",
+                    paciente.email
+                );
+
+            }
+
+
+            patient.appendChild(
+                option
+            );
+
+        }
+    );
+
+
+    /*
+     * Se não encontrou nenhum paciente,
+     * informa no select.
+     */
+
+    if (
+        pacientesUnicos.length === 0
+    ) {
+
+        patient.innerHTML = "";
+
+        var vazio =
+            document.createElement(
+                "option"
+            );
+
+        vazio.value = "";
+
+        vazio.textContent =
+            "Nenhum paciente cadastrado";
+
+        patient.appendChild(
+            vazio
         );
 
     }
@@ -248,11 +536,18 @@ function carregarPacientes() {
 function formatarCPF(cpf) {
 
     var valor =
-        String(cpf || "")
-            .replace(/\D/g, "");
+        String(
+            cpf || ""
+        )
+        .replace(
+            /\D/g,
+            ""
+        );
 
 
-    if (valor.length !== 11) {
+    if (
+        valor.length !== 11
+    ) {
 
         return cpf || "";
 
@@ -290,7 +585,9 @@ if (
     doctor.value =
         savedDoctor;
 
+
     atualizarMedico();
+
 
     localStorage.removeItem(
         "medicoSelecionado"
@@ -308,15 +605,18 @@ function atualizarMedico() {
     var selected =
         doctor.value;
 
+
     var specialty =
         document.getElementById(
             "doctorSpecialty"
         );
 
+
     var days =
         document.getElementById(
             "doctorDays"
         );
+
 
     var room =
         document.getElementById(
@@ -324,20 +624,27 @@ function atualizarMedico() {
         );
 
 
-    if (!selected) {
+    if (
+        !selected
+    ) {
 
         specialty.textContent =
             "—";
 
+
         days.textContent =
             "—";
+
 
         room.textContent =
             "—";
 
+
         limparHorarios();
 
+
         atualizarResumo();
+
 
         return;
 
@@ -351,8 +658,10 @@ function atualizarMedico() {
     specialty.textContent =
         data.specialty;
 
+
     days.textContent =
         data.days;
+
 
     room.textContent =
         data.room;
@@ -360,15 +669,20 @@ function atualizarMedico() {
 
     gerarHorarios();
 
+
     atualizarResumo();
 
 }
 
 
-doctor.addEventListener(
-    "change",
-    atualizarMedico
-);
+if (doctor) {
+
+    doctor.addEventListener(
+        "change",
+        atualizarMedico
+    );
+
+}
 
 
 // ======================================
@@ -377,7 +691,13 @@ doctor.addEventListener(
 
 function gerarHorarios() {
 
+    if (!hoursList || !appointmentTime) {
+        return;
+    }
+
+
     hoursList.innerHTML = "";
+
 
     appointmentTime.innerHTML =
         '<option value="">Selecione um horário</option>';
@@ -390,6 +710,7 @@ function gerarHorarios() {
 
         availableHours.style.display =
             "none";
+
 
         return;
 
@@ -408,11 +729,14 @@ function gerarHorarios() {
                     "button"
                 );
 
+
             button.type =
                 "button";
 
+
             button.className =
                 "hour-button";
+
 
             button.textContent =
                 time;
@@ -429,11 +753,14 @@ function gerarHorarios() {
                 index === 13;
 
 
-            if (occupied) {
+            if (
+                occupied
+            ) {
 
                 button.classList.add(
                     "unavailable"
                 );
+
 
                 button.disabled =
                     true;
@@ -460,18 +787,23 @@ function gerarHorarios() {
             );
 
 
-            if (!occupied) {
+            if (
+                !occupied
+            ) {
 
                 var option =
                     document.createElement(
                         "option"
                     );
 
+
                 option.value =
                     time;
 
+
                 option.textContent =
                     time;
+
 
                 appointmentTime.appendChild(
                     option
@@ -529,67 +861,79 @@ function selecionarHorario(
 // ALTERAÇÃO DE DATA
 // ======================================
 
-appointmentDate.addEventListener(
-    "change",
-    function () {
+if (appointmentDate) {
 
-        gerarHorarios();
+    appointmentDate.addEventListener(
+        "change",
+        function () {
 
-        atualizarResumo();
+            gerarHorarios();
 
-    }
-);
+            atualizarResumo();
+
+        }
+    );
+
+}
 
 
 // ======================================
 // ALTERAÇÃO DE HORÁRIO
 // ======================================
 
-appointmentTime.addEventListener(
-    "change",
-    function () {
+if (appointmentTime) {
 
-        document
-            .querySelectorAll(
-                ".hour-button"
-            )
-            .forEach(
-                function (button) {
+    appointmentTime.addEventListener(
+        "change",
+        function () {
 
-                    button.classList.remove(
-                        "selected"
-                    );
+            document
+                .querySelectorAll(
+                    ".hour-button"
+                )
+                .forEach(
+                    function (button) {
 
-
-                    if (
-                        button.textContent ===
-                        appointmentTime.value
-                    ) {
-
-                        button.classList.add(
+                        button.classList.remove(
                             "selected"
                         );
 
+
+                        if (
+                            button.textContent ===
+                            appointmentTime.value
+                        ) {
+
+                            button.classList.add(
+                                "selected"
+                            );
+
+                        }
+
                     }
-
-                }
-            );
+                );
 
 
-        atualizarResumo();
+            atualizarResumo();
 
-    }
-);
+        }
+    );
+
+}
 
 
 // ======================================
 // PACIENTE
 // ======================================
 
-patient.addEventListener(
-    "change",
-    atualizarResumo
-);
+if (patient) {
+
+    patient.addEventListener(
+        "change",
+        atualizarResumo
+    );
+
+}
 
 
 // ======================================
@@ -603,19 +947,24 @@ function atualizarResumo() {
             "summaryDoctor"
         );
 
+
     var summaryInfo =
         document.getElementById(
             "summaryInfo"
         );
 
 
-    if (!doctor.value) {
+    if (
+        !doctor.value
+    ) {
 
         summaryDoctor.textContent =
             "Médico não selecionado";
 
+
         summaryInfo.textContent =
             "Selecione os dados da consulta.";
+
 
         return;
 
@@ -634,7 +983,9 @@ function atualizarResumo() {
         doctorData.specialty;
 
 
-    if (patient.value) {
+    if (
+        patient.value
+    ) {
 
         texto +=
             " · " +
@@ -643,7 +994,9 @@ function atualizarResumo() {
     }
 
 
-    if (appointmentDate.value) {
+    if (
+        appointmentDate.value
+    ) {
 
         var partes =
             appointmentDate.value.split("-");
@@ -660,7 +1013,9 @@ function atualizarResumo() {
     }
 
 
-    if (appointmentTime.value) {
+    if (
+        appointmentTime.value
+    ) {
 
         texto +=
             " às " +
@@ -681,13 +1036,27 @@ function atualizarResumo() {
 
 function limparHorarios() {
 
-    hoursList.innerHTML = "";
+    if (hoursList) {
 
-    appointmentTime.innerHTML =
-        '<option value="">Selecione primeiro o médico e a data</option>';
+        hoursList.innerHTML = "";
 
-    availableHours.style.display =
-        "none";
+    }
+
+
+    if (appointmentTime) {
+
+        appointmentTime.innerHTML =
+            '<option value="">Selecione primeiro o médico e a data</option>';
+
+    }
+
+
+    if (availableHours) {
+
+        availableHours.style.display =
+            "none";
+
+    }
 
 }
 
@@ -696,9 +1065,15 @@ function limparHorarios() {
 // AGENDAR CONSULTA
 // ======================================
 
-document
-    .getElementById("appointmentForm")
-    .addEventListener(
+var appointmentForm =
+    document.getElementById(
+        "appointmentForm"
+    );
+
+
+if (appointmentForm) {
+
+    appointmentForm.addEventListener(
         "submit",
         function (event) {
 
@@ -715,6 +1090,7 @@ document
                 alert(
                     "Preencha médico, paciente, data e horário."
                 );
+
 
                 return;
 
@@ -801,6 +1177,8 @@ document
         }
     );
 
+}
+
 
 // ======================================
 // DATA E HORA
@@ -816,6 +1194,7 @@ function atualizarDataHora() {
         document.getElementById(
             "currentDate"
         );
+
 
     var hora =
         document.getElementById(
@@ -852,6 +1231,7 @@ function atualizarDataHora() {
 
 
 atualizarDataHora();
+
 
 setInterval(
     atualizarDataHora,
